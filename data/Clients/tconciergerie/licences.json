@@ -1,0 +1,10 @@
+[
+  {
+    "client": "tconciergerie",
+    "licence": "123456"
+  },
+  {
+    "client": "autre-client",
+    "licence": "ABCDEF"
+  }
+]
