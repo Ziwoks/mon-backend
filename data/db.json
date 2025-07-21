@@ -1,0 +1,53 @@
+{
+  "maisons": [
+    {
+      "nom": "Guillas mer",
+      "adresse": "TEst",
+      "telephone": "test",
+      "icsUrl": "https://www.airbnb.com/calendar/ical/772306560605609713.ics?s=a37336e320b560d3ce521608ab4a74c8&locale=fr",
+      "tempsMenage": 6
+    },
+    {
+      "nom": "Guillas Terre",
+      "adresse": "test",
+      "telephone": "test",
+      "icsUrl": "https://www.airbnb.com/calendar/ical/772299394930230844.ics?s=f96b5b59480ee9dc3e16af01108d86e6&locale=fr",
+      "tempsMenage": 4
+    },
+    {
+      "nom": "Brient ",
+      "adresse": "Brient ",
+      "telephone": "Brient ",
+      "icsUrl": "https://www.airbnb.com/calendar/ical/41735869.ics?s=cac9d4949bda816f4bd3f96c7e1733e1&locale=fr",
+      "tempsMenage": 3
+    },
+    {
+      "nom": "Camille ",
+      "adresse": "Camille ",
+      "telephone": "Camille ",
+      "icsUrl": "https://www.airbnb.com/calendar/ical/32373762.ics?s=b70938f3957e23f31f9f9de4a668ff97&locale=fr",
+      "tempsMenage": 2
+    },
+    {
+      "nom": "Le Guern ",
+      "adresse": "Le Guern ",
+      "telephone": "Le Guern ",
+      "icsUrl": "https://www.airbnb.com/calendar/ical/898996902188560117.ics?s=ab34b15b832f50f256f4f603e4e6a25b&locale=fr",
+      "tempsMenage": 4
+    },
+    {
+      "nom": "Trement ",
+      "adresse": "Trement ",
+      "telephone": "Trement ",
+      "icsUrl": "https://www.airbnb.com/calendar/ical/888201383143707964.ics?s=523efcd36d90beafa72d9e06b5d8e5b8&locale=fr",
+      "tempsMenage": 1
+    },
+    {
+      "nom": "Appartement Le pallier",
+      "adresse": "Appartement Le pallier",
+      "telephone": "Appartement Le pallier",
+      "icsUrl": "https://www.airbnb.com/calendar/ical/1176719400980751219.ics?s=de3b1fa3105f65d54d51830afd19a1c7&locale=fr",
+      "tempsMenage": 5
+    }
+  ]
+}

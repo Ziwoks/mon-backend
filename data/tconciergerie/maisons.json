@@ -1,0 +1,16 @@
+{
+  "maisons": [
+    {
+      "nom": "MAison test",
+      "adresse": "18 rue balaneyer",
+      "telephone": "0671780737",
+      "couleur": "#18f014"
+    },
+    {
+      "nom": "TEST 2",
+      "adresse": "adresse 2",
+      "telephone": "0101010101",
+      "couleur": "#f10909"
+    }
+  ]
+}
