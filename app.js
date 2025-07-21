@@ -13,23 +13,13 @@ app.use(bodyParser.json());
 
 const BASE_DIR = path.join(__dirname, 'data', 'clients');
 
-// 🔐 Middleware de vérification licence + client
+// 🔓 Middleware temporaire sans vérification licence
 app.use((req, res, next) => {
-  const client = req.headers['x-client-id'];
-  const licence = req.headers['x-licence-key'];
-
-  if (!client || !licence) return res.status(401).json({ error: 'Client ou licence manquants' });
-
-  const licencePath = path.join(BASE_DIR, client, 'licence.json');
-  if (!fs.existsSync(licencePath)) return res.status(403).json({ error: 'Client inconnu' });
-
-  const data = fs.readJSONSync(licencePath);
-  if (data.key !== licence) return res.status(403).json({ error: 'Licence invalide' });
-
-  req.client = client;
-  req.clientPath = path.join(BASE_DIR, client);
+  req.client = 'tconciergerie'; // Nom du dossier client
+  req.clientPath = path.join(BASE_DIR, req.client);
   next();
 });
+
 
 // 📅 PLANNING PAR MAISON
 app.get('/api/planning/:maison', (req, res) => {
