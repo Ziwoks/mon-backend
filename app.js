@@ -1,104 +1,238 @@
 const express = require('express');
-const cors = require('cors');
-const fs = require('fs-extra');
 const path = require('path');
-const bodyParser = require('body-parser');
-require('dotenv').config();
+const fs = require('fs');
+const low = require('lowdb');
+const FileSync = require('lowdb/adapters/FileSync');
+const multer = require('multer');
+const { parseICSFile } = require('./parser');
+const syncAll = require('./sync');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = 3000;
+const upload = multer({ dest: 'uploads/' });
 
-app.use(cors());
-app.use(bodyParser.json());
+const adapter = new FileSync('data/db.json');
+const db = low(adapter);
 
-const BASE_DIR = path.join(__dirname, 'data', 'clients');
+// Initialisation DB
+db.defaults({ maisons: [] }).write();
 
-// 🔐 Middleware de vérification licence + client
-app.use((req, res, next) => {
-  const client = req.headers['x-client-id'];
-  const licence = req.headers['x-licence-key'];
+// Middleware
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.static('public'));
+app.use('/views', express.static(path.join(__dirname, 'views')));
 
-  if (!client || !licence) return res.status(401).json({ error: 'Client ou licence manquants' });
-
-  const licencePath = path.join(BASE_DIR, client, 'licence.json');
-  if (!fs.existsSync(licencePath)) return res.status(403).json({ error: 'Client inconnu' });
-
-  const data = fs.readJSONSync(licencePath);
-  if (data.key !== licence) return res.status(403).json({ error: 'Licence invalide' });
-
-  req.client = client;
-  req.clientPath = path.join(BASE_DIR, client);
-  next();
+// 📍 Routes simples
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views/maisons.html'));
+});
+app.get('/import', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views/import.html'));
+});
+app.get('/planning', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views/planning.html'));
+});
+app.get('/employes.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views/employes.html'));
+});
+app.get('/test', (req, res) => {
+  res.send("✅ Route /test OK !");
 });
 
-// 📅 PLANNING PAR MAISON
-app.get('/api/planning/:maison', (req, res) => {
-  const file = path.join(req.clientPath, `planning-${req.params.maison}.json`);
-  if (!fs.existsSync(file)) return res.json([]);
-  res.json(fs.readJSONSync(file));
+
+// ✅ Création d'une maison
+app.post('/maison', (req, res) => {
+  const { nom, adresse, telephone, couleur, icsUrl, tempsMenage } = req.body;
+  db.get('maisons')
+    .push({ nom, adresse, telephone, color: couleur, icsUrl, tempsMenage: parseInt(tempsMenage) || 0 })
+    .write();
+  res.redirect('/');
 });
 
-app.post('/api/planning/:maison', (req, res) => {
-  const file = path.join(req.clientPath, `planning-${req.params.maison}.json`);
-  fs.writeJSONSync(file, req.body, { spaces: 2 });
-  res.json({ success: true });
-});
-
-// 🏠 MAISONS
-app.get('/api/maisons', (req, res) => {
-  const file = path.join(req.clientPath, 'maisons.json');
-  if (!fs.existsSync(file)) return res.json([]);
-  res.json(fs.readJSONSync(file));
-});
-
+// ✅ Création via fetch
 app.post('/api/maisons', (req, res) => {
-  const file = path.join(req.clientPath, 'maisons.json');
-  fs.writeJSONSync(file, req.body, { spaces: 2 });
-  res.json({ success: true });
+  const { nom, adresse, telephone, couleur, icsUrl, tempsMenage } = req.body;
+  db.get('maisons')
+    .push({ nom, adresse, telephone, color: couleur, icsUrl, tempsMenage: parseInt(tempsMenage) || 0 })
+    .write();
+  res.status(200).json({ message: "Maison ajoutée avec succès" });
 });
 
-app.delete('/api/maisons/:id', (req, res) => {
-  const file = path.join(req.clientPath, 'maisons.json');
-  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Fichier non trouvé' });
-  let maisons = fs.readJSONSync(file);
-  maisons = maisons.filter(m => m.id !== req.params.id);
-  fs.writeJSONSync(file, maisons, { spaces: 2 });
-  res.json({ success: true });
+// ✅ Mise à jour ou création si inexistante
+app.post('/update-maison', (req, res) => {
+  const { nom, adresse, telephone, couleur, icsUrl, tempsMenage } = req.body;
+
+  const maisonExistante = db.get('maisons').find({ nom }).value();
+
+  if (maisonExistante) {
+    db.get('maisons')
+      .find({ nom })
+      .assign({ adresse, telephone, color: couleur, icsUrl, tempsMenage: parseInt(tempsMenage) || 0 })
+      .write();
+  } else {
+    db.get('maisons')
+      .push({ nom, adresse, telephone, color: couleur, icsUrl, tempsMenage: parseInt(tempsMenage) || 0 })
+      .write();
+  }
+
+  res.redirect('/');
 });
 
-// 👷 EMPLOYÉS
-app.get('/api/employes', (req, res) => {
-  const file = path.join(req.clientPath, 'employes.json');
-  if (!fs.existsSync(file)) return res.json([]);
-  res.json(fs.readJSONSync(file));
+// ✅ Liste JSON des maisons
+app.get('/api/maisons', (req, res) => {
+  const maisons = db.get('maisons').value();
+  res.json(maisons);
 });
 
-app.post('/api/employes', (req, res) => {
-  const file = path.join(req.clientPath, 'employes.json');
-  fs.writeJSONSync(file, req.body, { spaces: 2 });
-  res.json({ success: true });
+// ✅ Planning d’un jour donné
+app.get('/api/planning/:date', (req, res) => {
+  const date = req.params.date;
+  const dataDir = path.join(__dirname, 'data');
+  const files = fs.readdirSync(dataDir).filter(f => f.startsWith('planning-'));
+
+  let allEvents = [];
+  files.forEach(file => {
+    const events = JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf8'));
+    const filtered = events.filter(ev => ev.date === date);
+    allEvents.push(...filtered);
+  });
+
+  res.json(allEvents);
 });
 
-// 🔄 ORDRE DES TÂCHES
-app.get('/api/ordre-taches', (req, res) => {
-  const file = path.join(req.clientPath, 'ordre-taches.json');
-  const date = req.query.date;
-  if (!fs.existsSync(file)) return res.json({});
-  const all = fs.readJSONSync(file);
-  res.json(all[date] || {});
+// ✅ Import de fichiers ICS
+app.post('/upload', upload.any(), (req, res) => {
+  const files = req.files;
+  const associations = req.body.maison;
+
+  if (!files || !Array.isArray(files)) {
+    return res.send('Aucun fichier ICS reçu.');
+  }
+
+  const maisons = db.get('maisons').value();
+
+  files.forEach((file, index) => {
+    const nomMaison = Array.isArray(associations) ? associations[index] : associations;
+    const maisonData = maisons.find(m => m.nom === nomMaison) || {};
+    const tasks = parseICSFile(file.path, nomMaison, maisonData);
+
+    const outputFile = `data/planning-${nomMaison}.json`;
+    let allTasks = [];
+
+    if (fs.existsSync(outputFile)) {
+      allTasks = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+    }
+
+    allTasks = [...allTasks, ...tasks];
+    fs.writeFileSync(outputFile, JSON.stringify(allTasks, null, 2));
+  });
+
+  res.redirect('/import');
 });
 
+// ✅ Lancement de la synchronisation automatique
+setInterval(() => {
+  console.log("⏳ Lancement de la synchronisation automatique des ICS...");
+  syncAll();
+}, 30 * 60 * 1000);
+// ✅ Route pour sauvegarder l'ordre des tâches par employé
 app.post('/api/sauver-ordre-taches', (req, res) => {
-  const file = path.join(req.clientPath, 'ordre-taches.json');
   const { date, employe, ordre } = req.body;
-  const all = fs.existsSync(file) ? fs.readJSONSync(file) : {};
-  all[date] = all[date] || {};
-  all[date][employe] = ordre;
-  fs.writeJSONSync(file, all, { spaces: 2 });
-  res.json({ success: true });
+
+  const ordrePath = path.join(__dirname, 'data', 'ordre-taches.json');
+
+  let data = {};
+if (fs.existsSync(ordrePath)) {
+  data = JSON.parse(fs.readFileSync(ordrePath, 'utf8'));
+}
+
+if (!data[date]) {
+  data[date] = {};
+}
+data[date][employe] = ordre;
+
+fs.writeFileSync(ordrePath, JSON.stringify(data, null, 2));
+res.sendStatus(200);
+
 });
 
-// ✅ DÉMARRAGE
-app.listen(PORT, () => {
-  console.log(`✅ Serveur API prêt sur http://localhost:${PORT}`);
+// ✅ Route pour lire l’ordre des tâches enregistré
+app.get('/api/ordre-taches', (req, res) => {
+  const ordrePath = path.join(__dirname, 'data', 'ordre-taches.json');
+  const date = req.query.date;
+
+  if (!fs.existsSync(ordrePath)) return res.json({});
+
+  const data = JSON.parse(fs.readFileSync(ordrePath, 'utf8'));
+  res.json(data[date] || {});
+});
+
+// ✅ Suppression d'une maison
+app.post('/api/supprimer-maison', (req, res) => {
+  const { nom } = req.body;
+
+  const maison = db.get('maisons').find({ nom }).value();
+
+  if (!maison) {
+    return res.status(404).json({ message: "Maison non trouvée." });
+  }
+
+  db.get('maisons').remove({ nom }).write();
+
+  res.status(200).json({ message: "Maison supprimée avec succès." });
+});
+// ✅ Lancement du serveur
+app.listen(port, () => {
+  console.log(`🟢 Serveur démarré sur http://localhost:${port}`);
+});
+
+app.post('/api/assigner-employe', (req, res) => {
+  const { id, employe } = req.body;
+  const dataDir = path.join(__dirname, 'data');
+  const files = fs.readdirSync(dataDir).filter(f => f.startsWith('planning-'));
+  let found = false;
+
+  for (const file of files) {
+    const filePath = path.join(dataDir, file);
+    let events = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const index = events.findIndex(ev => ev.id === id);
+    if (index !== -1) {
+      events[index].employe = employe;
+      fs.writeFileSync(filePath, JSON.stringify(events, null, 2));
+      found = true;
+      break;
+    }
+  }
+
+  if (found) {
+    res.status(200).json({ message: "Employé assigné avec succès." });
+  } else {
+    res.status(404).json({ error: "Événement non trouvé." });
+  }
+});
+
+app.post('/api/assigner-couleur', (req, res) => {
+  const { id, etat } = req.body;
+  const dataDir = path.join(__dirname, 'data');
+  const files = fs.readdirSync(dataDir).filter(f => f.startsWith('planning-'));
+  let found = false;
+
+  for (const file of files) {
+    const filePath = path.join(dataDir, file);
+    let events = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const index = events.findIndex(ev => ev.id === id);
+    if (index !== -1) {
+      events[index].done = etat;
+      fs.writeFileSync(filePath, JSON.stringify(events, null, 2));
+      found = true;
+      break;
+    }
+  }
+
+  if (found) {
+    res.status(200).json({ message: "État de la case sauvegardé." });
+  } else {
+    res.status(404).json({ error: "Événement non trouvé." });
+  }
 });
